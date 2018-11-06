@@ -12,8 +12,8 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-// TriggerConfig struct for YAML file
-type TriggerConfig struct {
+// WatchdogConfig struct for YAML file
+type WatchdogConfig struct {
 	GitLab struct {
 		Host     string `yaml:"host"`
 		Group    string `yaml:"group"`
@@ -24,7 +24,7 @@ type TriggerConfig struct {
 }
 
 // Read config YAML file, then return Config
-func (config *TriggerConfig) read(file string) *TriggerConfig {
+func (config *WatchdogConfig) read(file string) *WatchdogConfig {
 	yamlFile, err := ioutil.ReadFile(file)
 	printErrorThenExit(err, "Read YAML file error")
 
@@ -35,7 +35,7 @@ func (config *TriggerConfig) read(file string) *TriggerConfig {
 }
 
 // Validate YAML file configs
-func (config *TriggerConfig) validate() {
+func (config *WatchdogConfig) validate() {
 	var err error
 	switch {
 	case config.GitLab.Host == "":
@@ -80,7 +80,7 @@ type GitLabGroupResponse struct {
 
 // GitLabProject for project structure in GitLabGroupResponse
 type GitLabProject struct {
-	ID   string `json:"id"`
+	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -106,7 +106,7 @@ func (utility *GitLabUtility) fetchGroupProjects() ([]GitLabProject, error) {
 
 		json.Unmarshal(body, &model)
 
-		return model.Projects, errors.New("----")
+		return model.Projects, nil
 	case 404:
 		return []GitLabProject{}, errors.New("----")
 	default:
@@ -123,7 +123,7 @@ func main() {
 	flag.Parse()
 
 	// Read & validate config.yml
-	var config TriggerConfig
+	var config WatchdogConfig
 	config.read(*configFilePath)
 	config.validate()
 
@@ -133,8 +133,8 @@ func main() {
 	gitlab.username = config.GitLab.Username
 	gitlab.token = config.GitLab.Token
 
-	// projects, err := gitlab.fetchGroupProjects()
-	// printErrorThenExit(err, "")
+	projects, err := gitlab.fetchGroupProjects()
+	printErrorThenExit(err, "")
 
-	fmt.Println(gitlab)
+	fmt.Println(len(projects))
 }
