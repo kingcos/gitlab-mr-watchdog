@@ -13,8 +13,10 @@ import (
 // TriggerConfig struct for YAML file
 type TriggerConfig struct {
 	GitLab struct {
-		Owner   string `yaml:"owner"`
-		Project string `yaml:"project"`
+		Host     string `yaml:"host"`
+		Group    string `yaml:"group"`
+		Username string `yaml:"username"`
+		Project  string `yaml:"project"`
 	} `yaml:"GitLab"`
 }
 
@@ -33,8 +35,10 @@ func (config *TriggerConfig) read(file string) *TriggerConfig {
 func (config *TriggerConfig) validate() {
 	var err error
 	switch {
-	case config.GitLab.Owner == "":
-		err = errors.New("GitLab owner is required")
+	case config.GitLab.Host == "":
+		err = errors.New("GitLab host is required")
+	case config.GitLab.Group == "" && config.GitLab.Username == "":
+		err = errors.New("GitLab group or username is required")
 	case config.GitLab.Project == "":
 		err = errors.New("GitLab project is required")
 	}
