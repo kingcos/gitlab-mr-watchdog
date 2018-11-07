@@ -75,8 +75,8 @@ type GitLabUtility struct {
 	owner string
 }
 
-// GitLabGroupResponse for GitLab API response of `group`
-type GitLabGroupResponse struct {
+// GitLabProjectsResponse for GitLab API response of `group`
+type GitLabProjectsResponse struct {
 	Projects []GitLabProject `json:"projects"`
 }
 
@@ -130,16 +130,38 @@ func (utility *GitLabUtility) fetchMergeRequestsByID(id int, params string) ([]G
 }
 
 // Fetch GitLab projects
-func (utility *GitLabUtility) fetchProjects(isByGroup bool) ([]GitLabProject, error) {
+func (utility *GitLabUtility) fetchProjectIDByName(isByGroup bool, name string) (int, error) {
+	projects := []GitLabProject{}
 	if isByGroup {
-		return utility.fetchGroupProjects()
+		projects, err := utility.fetchGroupProjects()
+
+		// Get GitLab group's project by ID
+		for _, project := range projects {
+			if project.Name == name {
+				return project.ID, nil
+			}
+		}
+
+		return -1, errors.New("")
 	} else {
-		return utility.fetchUserProjects()
+		// projects, err := utility.fetchUserProjects()
+		userID, err := utility.fetchUserIDByUsername()
+		if err != nil {
+
+		}
+
+		projectID, err := utility.fetchProjectIDByUserIDAndProjectName(userID, name)
+		if err != nil {
+
+		}
+
 	}
+
 }
 
 // Fetch GitLab group's projects
 func (utility *GitLabUtility) fetchGroupProjects() ([]GitLabProject, error) {
+
 	apiURL := utility.host + "/api/v4/groups/" + utility.owner
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("Private-Token", utility.token)
@@ -156,7 +178,7 @@ func (utility *GitLabUtility) fetchGroupProjects() ([]GitLabProject, error) {
 	switch response.StatusCode {
 	case 200:
 		body, _ := ioutil.ReadAll(response.Body)
-		var model GitLabGroupResponse
+		var model GitLabProjectsResponse
 
 		json.Unmarshal(body, &model)
 
@@ -169,9 +191,89 @@ func (utility *GitLabUtility) fetchGroupProjects() ([]GitLabProject, error) {
 	}
 }
 
+// Fetch GitLab user ID by username
+func (utility *GitLabUtility) fetchUserIDByUsername() (int, error) {
+	type GitLabUserResponse struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+
+	apiURL := utility.host + "/api/v4/users?username=" + utility.owner
+	request, _ := http.NewRequest("GET", apiURL, nil)
+	request.Header.Set("Private-Token", utility.token)
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		return -1, err
+	}
+
+	defer response.Body.Close()
+
+	// Print info when success or failure
+	switch response.StatusCode {
+	case 200:
+		body, _ := ioutil.ReadAll(response.Body)
+		var models []GitLabUserResponse
+
+		json.Unmarshal(body, &models)
+
+		if len(models) == 1 {
+			return models[0].ID, nil
+		}
+
+		return -1, errors.New("----")
+	case 404:
+		return -1, errors.New("----")
+	default:
+		body, _ := ioutil.ReadAll(response.Body)
+		return -1, errors.New("Unknown: " + string(body))
+	}
+}
+
+func (utility *GitLabUtility) fetchProjectIDByUserIDAndProjectName(userID int, projectName string) (int, error) {
+	apiURL := utility.host + "/api/v4/users/" + fmt.Sprint(userID) + "/projects?search=" + projectName
+	request, _ := http.NewRequest("GET", apiURL, nil)
+	request.Header.Set("Private-Token", utility.token)
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		return -1, err
+	}
+
+	defer response.Body.Close()
+
+	// Print info when success or failure
+	switch response.StatusCode {
+	case 200:
+		body, _ := ioutil.ReadAll(response.Body)
+		var models []GitLabProject
+
+		json.Unmarshal(body, &models)
+
+		for _, model := range models {
+			if model.Name == projectName {
+				return model.ID, nil
+			}
+		}
+
+		return -1, errors.New("----")
+	default:
+		body, _ := ioutil.ReadAll(response.Body)
+		return -1, errors.New("Unknown: " + string(body))
+	}
+}
+
 // Fetch GitLab user's projects
 func (utility *GitLabUtility) fetchUserProjects() ([]GitLabProject, error) {
-	apiURL := utility.host + "/api/v4/groups/" + utility.owner
+
+	type GitLabUserResponse struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+
+	apiURL := utility.host + "/api/v4/users?username=" + utility.owner
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("Private-Token", utility.token)
 
@@ -187,9 +289,9 @@ func (utility *GitLabUtility) fetchUserProjects() ([]GitLabProject, error) {
 	switch response.StatusCode {
 	case 200:
 		body, _ := ioutil.ReadAll(response.Body)
-		var model GitLabGroupResponse
+		var models []GitLabUserResponse
 
-		json.Unmarshal(body, &model)
+		json.Unmarshal(body, &models)
 
 		return model.Projects, nil
 	case 404:
@@ -215,25 +317,10 @@ func main() {
 	config.read(*configFilePath)
 	config.validate()
 
-	gitlab := GitLabUtility{}
-	gitlab.host = config.GitLab.Host
-	gitlab.owner = config.GitLab.Owner
-	gitlab.token = config.GitLab.Token
+	gitlab := GitLabUtility{config.GitLab.Host, config.GitLab.Owner, config.GitLab.Token}
 
-	projects, err := gitlab.fetchProjects(*isByGroup)
+	projectID, err := gitlab.fetchProjectIDByName(*isByGroup, config.GitLab.Project)
 	printErrorThenExit(err, "")
-
-	projectID := -1
-	// Get GitLab group's project by ID
-	for _, project := range projects {
-		if project.Name == config.GitLab.Project {
-			projectID = project.ID
-		}
-	}
-
-	if projectID == -1 {
-		printErrorThenExit(errors.New(""), "")
-	}
 
 	mergeRequests, err := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
