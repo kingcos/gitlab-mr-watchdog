@@ -88,7 +88,7 @@ type GitLabProject struct {
 
 // GitLabMergeRequest for GitLab merge requests structure
 type GitLabMergeRequest struct {
-	IID       string `json:"iid"`
+	IID       int    `json:"iid"`
 	Title     string `json:"title"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
@@ -102,7 +102,7 @@ type GitLabMergeRequest struct {
 
 // Fetch GitLab merge requests by ID
 func (utility *GitLabUtility) fetchMergeRequestsByID(id int, params string) ([]GitLabMergeRequest, error) {
-	apiURL := utility.host + "/api/v4/projects/" + string(id) + "/merge_requests/" + params
+	apiURL := utility.host + "/api/v4/projects/" + fmt.Sprint(id) + "/merge_requests/" + params
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("Private-Token", utility.token)
 
@@ -131,9 +131,8 @@ func (utility *GitLabUtility) fetchMergeRequestsByID(id int, params string) ([]G
 
 // Fetch GitLab projects
 func (utility *GitLabUtility) fetchProjectIDByName(isByGroup bool, name string) (int, error) {
-	projects := []GitLabProject{}
 	if isByGroup {
-		projects, err := utility.fetchGroupProjects()
+		projects, _ := utility.fetchGroupProjects()
 
 		// Get GitLab group's project by ID
 		for _, project := range projects {
@@ -143,20 +142,16 @@ func (utility *GitLabUtility) fetchProjectIDByName(isByGroup bool, name string) 
 		}
 
 		return -1, errors.New("")
-	} else {
-		// projects, err := utility.fetchUserProjects()
-		userID, err := utility.fetchUserIDByUsername()
-		if err != nil {
-
-		}
-
-		projectID, err := utility.fetchProjectIDByUserIDAndProjectName(userID, name)
-		if err != nil {
-
-		}
-
 	}
 
+	userID, err := utility.fetchUserIDByUsername()
+	projectID, err := utility.fetchProjectIDByUserIDAndProjectName(userID, name)
+
+	if err != nil {
+		return -1, nil
+	}
+
+	return projectID, nil
 }
 
 // Fetch GitLab group's projects
@@ -265,43 +260,6 @@ func (utility *GitLabUtility) fetchProjectIDByUserIDAndProjectName(userID int, p
 	}
 }
 
-// Fetch GitLab user's projects
-func (utility *GitLabUtility) fetchUserProjects() ([]GitLabProject, error) {
-
-	type GitLabUserResponse struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-	}
-
-	apiURL := utility.host + "/api/v4/users?username=" + utility.owner
-	request, _ := http.NewRequest("GET", apiURL, nil)
-	request.Header.Set("Private-Token", utility.token)
-
-	client := &http.Client{}
-	response, err := client.Do(request)
-	if err != nil {
-		return []GitLabProject{}, err
-	}
-
-	defer response.Body.Close()
-
-	// Print info when success or failure
-	switch response.StatusCode {
-	case 200:
-		body, _ := ioutil.ReadAll(response.Body)
-		var models []GitLabUserResponse
-
-		json.Unmarshal(body, &models)
-
-		return model.Projects, nil
-	case 404:
-		return []GitLabProject{}, errors.New("----")
-	default:
-		body, _ := ioutil.ReadAll(response.Body)
-		return []GitLabProject{}, errors.New("Unknown: " + string(body))
-	}
-}
-
 func timeDuring(start string, end string, format string) {
 
 }
@@ -309,7 +267,7 @@ func timeDuring(start string, end string, format string) {
 func main() {
 	// Read config file path from command line
 	var configFilePath = flag.String("path", "config.yml", "Setup your configuration file path.")
-	var isByGroup = flag.Bool("group", false, "Setup project owner type (owned by a group or user).")
+	var isByGroup = flag.Bool("group", true, "Setup project owner type (owned by a group or user).")
 	flag.Parse()
 
 	// Read & validate config.yml
@@ -317,7 +275,7 @@ func main() {
 	config.read(*configFilePath)
 	config.validate()
 
-	gitlab := GitLabUtility{config.GitLab.Host, config.GitLab.Owner, config.GitLab.Token}
+	gitlab := GitLabUtility{config.GitLab.Host, config.GitLab.Token, config.GitLab.Owner}
 
 	projectID, err := gitlab.fetchProjectIDByName(*isByGroup, config.GitLab.Project)
 	printErrorThenExit(err, "")
@@ -325,7 +283,7 @@ func main() {
 	mergeRequests, err := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
 	for {
-		time.AfterFunc(time.Duration(config.Watchdog.Duration)*time.Minute, func() {
+		time.AfterFunc(time.Duration(config.Watchdog.Duration)*time.Second, func() {
 			// do sth...
 
 			for _, mergeRequest := range mergeRequests {
