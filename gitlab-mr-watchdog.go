@@ -16,14 +16,13 @@ import (
 // WatchdogConfig struct for YAML file
 type WatchdogConfig struct {
 	GitLab struct {
-		Host     string `yaml:"host"`
-		Group    string `yaml:"group"`
-		Username string `yaml:"username"`
-		Project  string `yaml:"project"`
-		Token    string `yaml:"token"`
+		Host    string `yaml:"host"`
+		Owner   string `yaml:"owner"`
+		Project string `yaml:"project"`
+		Token   string `yaml:"token"`
 	} `yaml:"GitLab"`
 	Watchdog struct {
-		Duration float64 `yaml:"duration"`
+		Duration int `yaml:"duration"`
 	} `yaml:"Watchdog"`
 }
 
@@ -44,8 +43,8 @@ func (config *WatchdogConfig) validate() {
 	switch {
 	case config.GitLab.Host == "":
 		err = errors.New("GitLab host is required")
-	case config.GitLab.Group == "" && config.GitLab.Username == "":
-		err = errors.New("GitLab group or username is required")
+	case config.GitLab.Owner == "":
+		err = errors.New("GitLab owner is required")
 	case config.GitLab.Project == "":
 		err = errors.New("GitLab project is required")
 	case config.GitLab.Token == "":
@@ -71,10 +70,9 @@ func printErrorThenExit(err error, message string) {
 
 // GitLabUtility struct for GitLab uitility properties & funcs
 type GitLabUtility struct {
-	host     string
-	token    string
-	username string
-	group    string
+	host  string
+	token string
+	owner string
 }
 
 // GitLabGroupResponse for GitLab API response of `group`
@@ -95,6 +93,7 @@ type GitLabMergeRequest struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 	WIP       string `json:"work_in_progress"`
+	WebURL    string `json:"web_url"`
 	Author    struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
@@ -130,9 +129,18 @@ func (utility *GitLabUtility) fetchMergeRequestsByID(id int, params string) ([]G
 	}
 }
 
+// Fetch GitLab projects
+func (utility *GitLabUtility) fetchProjects(isByGroup bool) ([]GitLabProject, error) {
+	if isByGroup {
+		return utility.fetchGroupProjects()
+	} else {
+		return utility.fetchUserProjects()
+	}
+}
+
 // Fetch GitLab group's projects
 func (utility *GitLabUtility) fetchGroupProjects() ([]GitLabProject, error) {
-	apiURL := utility.host + "/api/v4/groups/" + utility.group
+	apiURL := utility.host + "/api/v4/groups/" + utility.owner
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("Private-Token", utility.token)
 
@@ -161,9 +169,45 @@ func (utility *GitLabUtility) fetchGroupProjects() ([]GitLabProject, error) {
 	}
 }
 
+// Fetch GitLab user's projects
+func (utility *GitLabUtility) fetchUserProjects() ([]GitLabProject, error) {
+	apiURL := utility.host + "/api/v4/groups/" + utility.owner
+	request, _ := http.NewRequest("GET", apiURL, nil)
+	request.Header.Set("Private-Token", utility.token)
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		return []GitLabProject{}, err
+	}
+
+	defer response.Body.Close()
+
+	// Print info when success or failure
+	switch response.StatusCode {
+	case 200:
+		body, _ := ioutil.ReadAll(response.Body)
+		var model GitLabGroupResponse
+
+		json.Unmarshal(body, &model)
+
+		return model.Projects, nil
+	case 404:
+		return []GitLabProject{}, errors.New("----")
+	default:
+		body, _ := ioutil.ReadAll(response.Body)
+		return []GitLabProject{}, errors.New("Unknown: " + string(body))
+	}
+}
+
+func timeDuring(start string, end string, format string) {
+
+}
+
 func main() {
 	// Read config file path from command line
 	var configFilePath = flag.String("path", "config.yml", "Setup your configuration file path.")
+	var isByGroup = flag.Bool("group", false, "Setup project owner type (owned by a group or user).")
 	flag.Parse()
 
 	// Read & validate config.yml
@@ -173,11 +217,10 @@ func main() {
 
 	gitlab := GitLabUtility{}
 	gitlab.host = config.GitLab.Host
-	gitlab.group = config.GitLab.Group
-	gitlab.username = config.GitLab.Username
+	gitlab.owner = config.GitLab.Owner
 	gitlab.token = config.GitLab.Token
 
-	projects, err := gitlab.fetchGroupProjects()
+	projects, err := gitlab.fetchProjects(*isByGroup)
 	printErrorThenExit(err, "")
 
 	projectID := -1
@@ -192,11 +235,16 @@ func main() {
 		printErrorThenExit(errors.New(""), "")
 	}
 
-	gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
+	mergeRequests, err := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
 	for {
 		time.AfterFunc(time.Duration(config.Watchdog.Duration)*time.Minute, func() {
 			// do sth...
+
+			for _, mergeRequest := range mergeRequests {
+				username := mergeRequest.Author.Username
+				fmt.Print(username)
+			}
 		})
 	}
 }
