@@ -300,6 +300,7 @@ func main() {
 		}
 	}()
 
+	// For infinite goroutine
 	for {
 	}
 }
