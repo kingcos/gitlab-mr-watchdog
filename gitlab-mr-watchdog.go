@@ -49,6 +49,8 @@ func (config *WatchdogConfig) validate() {
 		err = errors.New("GitLab project is required")
 	case config.GitLab.Token == "":
 		err = errors.New("GitLab token is required")
+		// case config.Watchdog.Duration == nil:
+		// 	err = errors.New("GitLab token is required")
 	}
 
 	if err != nil {
@@ -280,16 +282,24 @@ func main() {
 	projectID, err := gitlab.fetchProjectIDByName(*isByGroup, config.GitLab.Project)
 	printErrorThenExit(err, "")
 
-	mergeRequests, err := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
+	ticker := time.NewTicker(time.Duration(config.Watchdog.Duration) * time.Second)
 
-	for {
-		time.AfterFunc(time.Duration(config.Watchdog.Duration)*time.Second, func() {
-			// do sth...
+	num := 0
+	go func() {
+		for {
+			<-ticker.C
+			num++
+			fmt.Println("No.", num)
+
+			mergeRequests, _ := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
 			for _, mergeRequest := range mergeRequests {
 				username := mergeRequest.Author.Username
-				fmt.Print(username)
+				fmt.Println(username)
 			}
-		})
+		}
+	}()
+
+	for {
 	}
 }
