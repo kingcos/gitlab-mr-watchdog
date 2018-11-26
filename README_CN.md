@@ -4,7 +4,7 @@
 
 [English](README.md) | 中文
 
-监控 GitLab Merge Request 状态，并通知。
+监控 GitLab Merge Request 状态，并及时通知。
 
 ## 配置
 
