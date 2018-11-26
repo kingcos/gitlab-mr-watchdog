@@ -5,3 +5,24 @@
 [English](README.md) | 中文
 
 监控 GitLab Merge Request 状态，并通知。
+
+## 配置
+
+```yml
+GitLab:
+  host: GITLAB_HOST_ADDRESS (REQUIRED)
+  owner: GITLAB_PROJECT_OWNER (REQUIRED)
+  project: GITLAB_PROJECT_NAME (REQUIRED)
+  token: GITLAB_PUBLIC_USER_TOKEN (REQUIRED)
+
+TimeOut:
+  created: TIMEOUT_DURATION_SINCE_CREATED (MINUTES)
+  updated: TIMEOUT_DURATION_SINCE_UPDATED (MINUTES)
+  start: TIME_START_OF_A_DAY (hh:mm)
+  end: TIME_END_OF_A_DAY (hh:mm)
+
+Watchdog:
+  duration: WATCHDOG_REFRESH_DURATION (MINUTES)
+  action:
+    sh: WATCHDOG_SHELL_ACTION
+```
