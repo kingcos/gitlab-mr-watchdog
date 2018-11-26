@@ -295,7 +295,9 @@ func main() {
 
 			for _, mergeRequest := range mergeRequests {
 				username := mergeRequest.Author.Username
-				fmt.Println(username)
+				createdAt := mergeRequest.CreatedAt
+				updatedAt := mergeRequest.UpdatedAt
+				fmt.Println(username, createdAt, updatedAt)
 			}
 		}
 	}()
