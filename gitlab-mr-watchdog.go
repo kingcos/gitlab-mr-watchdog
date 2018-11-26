@@ -21,6 +21,10 @@ type WatchdogConfig struct {
 		Project string `yaml:"project"`
 		Token   string `yaml:"token"`
 	} `yaml:"GitLab"`
+	TimeOut struct {
+		Created float64 `yaml:"created"`
+		Updated float64 `yaml:"updated"`
+	} `yaml:"TimeOut"`
 	Watchdog struct {
 		Duration int `yaml:"duration"`
 	} `yaml:"Watchdog"`
@@ -262,8 +266,16 @@ func (utility *GitLabUtility) fetchProjectIDByUserIDAndProjectName(userID int, p
 	}
 }
 
-func timeDuring(start string, end string, format string) {
+func isTimeOut(createdAtTime string, updatedAtTime string, createdTimeOut float64, updatedTimeOut float64) bool {
+	format := "2006-01-02T15:04:05.999999-07:00"
 
+	return durationFromNow(createdAtTime, format) > createdTimeOut && durationFromNow(updatedAtTime, format) > updatedTimeOut
+}
+
+func durationFromNow(start string, format string) float64 {
+	startTime, _ := time.Parse(format, start)
+
+	return time.Now().Sub(startTime).Minutes()
 }
 
 func main() {
@@ -281,13 +293,14 @@ func main() {
 
 	projectID, err := gitlab.fetchProjectIDByName(*isByGroup, config.GitLab.Project)
 	printErrorThenExit(err, "")
+	fmt.Println(projectID)
 
-	ticker := time.NewTicker(time.Duration(config.Watchdog.Duration) * time.Second)
+	tick := time.Tick(time.Duration(config.Watchdog.Duration) * time.Second)
 
 	num := 0
-	go func() {
-		for {
-			<-ticker.C
+	for {
+		select {
+		case <-tick:
 			num++
 			fmt.Println("No.", num)
 
@@ -295,14 +308,11 @@ func main() {
 
 			for _, mergeRequest := range mergeRequests {
 				username := mergeRequest.Author.Username
-				createdAt := mergeRequest.CreatedAt
-				updatedAt := mergeRequest.UpdatedAt
-				fmt.Println(username, createdAt, updatedAt)
+
+				if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
+					fmt.Println(username)
+				}
 			}
 		}
-	}()
-
-	// For infinite goroutine
-	for {
 	}
 }
