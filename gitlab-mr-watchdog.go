@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"time"
 
 	yaml "gopkg.in/yaml.v2"
@@ -29,6 +30,9 @@ type WatchdogConfig struct {
 	} `yaml:"TimeOut"`
 	Watchdog struct {
 		Duration int `yaml:"duration"`
+		Action   struct {
+			Shell string `yaml:"sh"`
+		} `yaml:"action"`
 	} `yaml:"Watchdog"`
 }
 
@@ -322,8 +326,10 @@ func main() {
 					username := mergeRequest.Author.Username
 
 					if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
-						fmt.Println(username)
+						cmd := exec.Command(config.Watchdog.Action.Shell, username)
+						cmd.Run()
 
+						fmt.Println("Finish running command.")
 					}
 				}
 			} else {
