@@ -326,10 +326,13 @@ func main() {
 					username := mergeRequest.Author.Username
 
 					if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
-						cmd := exec.Command(config.Watchdog.Action.Shell, username)
-						cmd.Run()
+						command := config.Watchdog.Action.Shell + " " + username + ` "Your merge request is still opened, please check it!"`
+						cmd := exec.Command("/bin/bash", "-c", command)
 
-						fmt.Println("Finish running command.")
+						output, err := cmd.Output()
+						printErrorThenExit(err, "Running shell error")
+
+						fmt.Printf("Shell output: %s", string(output))
 					}
 				}
 			} else {
