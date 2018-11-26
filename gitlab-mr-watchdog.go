@@ -24,6 +24,8 @@ type WatchdogConfig struct {
 	TimeOut struct {
 		Created float64 `yaml:"created"`
 		Updated float64 `yaml:"updated"`
+		Start   string  `yaml:"start"`
+		End     string  `yaml:"end"`
 	} `yaml:"TimeOut"`
 	Watchdog struct {
 		Duration int `yaml:"duration"`
@@ -266,6 +268,15 @@ func (utility *GitLabUtility) fetchProjectIDByUserIDAndProjectName(userID int, p
 	}
 }
 
+func isNowInDuration(start string, end string) bool {
+	format := "15:04"
+	startHour, _ := time.Parse(format, start)
+	endHour, _ := time.Parse(format, end)
+	nowHour, _ := time.Parse(format, time.Now().Format(format))
+
+	return nowHour.Sub(startHour).Minutes() > 0 && nowHour.Sub(endHour).Minutes() < 0
+}
+
 func isTimeOut(createdAtTime string, updatedAtTime string, createdTimeOut float64, updatedTimeOut float64) bool {
 	format := "2006-01-02T15:04:05.999999-07:00"
 
@@ -301,17 +312,22 @@ func main() {
 	for {
 		select {
 		case <-tick:
-			num++
-			fmt.Println("No.", num)
+			if isNowInDuration(config.TimeOut.Start, config.TimeOut.End) {
+				num++
+				fmt.Println("No.", num)
 
-			mergeRequests, _ := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
+				mergeRequests, _ := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
-			for _, mergeRequest := range mergeRequests {
-				username := mergeRequest.Author.Username
+				for _, mergeRequest := range mergeRequests {
+					username := mergeRequest.Author.Username
 
-				if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
-					fmt.Println(username)
+					if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
+						fmt.Println(username)
+
+					}
 				}
+			} else {
+				fmt.Println("Not in running durations.")
 			}
 		}
 	}
