@@ -308,7 +308,6 @@ func main() {
 
 	projectID, err := gitlab.fetchProjectIDByName(*isByGroup, config.GitLab.Project)
 	printErrorThenExit(err, "")
-	fmt.Println(projectID)
 
 	tick := time.Tick(time.Duration(config.Watchdog.Duration) * time.Minute)
 
@@ -323,10 +322,9 @@ func main() {
 				mergeRequests, _ := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
 				for _, mergeRequest := range mergeRequests {
-					username := mergeRequest.Author.Username
 
 					if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
-						command := config.Watchdog.Action.Shell + " " + username + " \"Your merge request [" + mergeRequest.Title + "] is still opened, please check it!\n\n" + mergeRequest.WebURL + "\""
+						command := config.Watchdog.Action.Shell + " " + mergeRequest.Author.Username + " \"Your merge request [" + mergeRequest.Title + "] is still opened, please check it!\n\n" + mergeRequest.WebURL + "\""
 						cmd := exec.Command("/bin/bash", "-c", command)
 
 						fmt.Printf("Running command: %s\n", command)
