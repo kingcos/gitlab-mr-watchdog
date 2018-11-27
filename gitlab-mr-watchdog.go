@@ -310,7 +310,7 @@ func main() {
 	printErrorThenExit(err, "")
 	fmt.Println(projectID)
 
-	tick := time.Tick(time.Duration(config.Watchdog.Duration) * time.Second)
+	tick := time.Tick(time.Duration(config.Watchdog.Duration) * time.Minute)
 
 	num := 0
 	for {
@@ -326,8 +326,10 @@ func main() {
 					username := mergeRequest.Author.Username
 
 					if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
-						command := config.Watchdog.Action.Shell + " " + username + ` "Your merge request is still opened, please check it!"`
+						command := config.Watchdog.Action.Shell + " " + username + " \"Your merge request [" + mergeRequest.Title + "] is still opened, please check it!\n\n" + mergeRequest.WebURL + "\""
 						cmd := exec.Command("/bin/bash", "-c", command)
+
+						fmt.Printf("Running command: %s", command)
 
 						output, err := cmd.Output()
 						printErrorThenExit(err, "Running shell error")
