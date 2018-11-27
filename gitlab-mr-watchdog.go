@@ -329,12 +329,12 @@ func main() {
 						command := config.Watchdog.Action.Shell + " " + username + " \"Your merge request [" + mergeRequest.Title + "] is still opened, please check it!\n\n" + mergeRequest.WebURL + "\""
 						cmd := exec.Command("/bin/bash", "-c", command)
 
-						fmt.Printf("Running command: %s", command)
+						fmt.Printf("Running command: %s\n", command)
 
 						output, err := cmd.Output()
 						printErrorThenExit(err, "Running shell error")
 
-						fmt.Printf("Shell output: %s", string(output))
+						fmt.Printf("Shell output: %s\n", string(output))
 					}
 				}
 			} else {
