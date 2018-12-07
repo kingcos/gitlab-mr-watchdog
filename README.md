@@ -6,6 +6,8 @@ English | [中文](README_CN.md)
 
 Watch your GitLab merge requests status, then notify you in time.
 
+![What](What.png)
+
 ## Configurations
 
 ```yml

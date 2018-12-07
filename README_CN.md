@@ -4,6 +4,8 @@
 
 [English](README.md) | 中文
 
+![What](What.png)
+
 监控 GitLab Merge Request 状态，并及时通知。
 
 ## 配置
