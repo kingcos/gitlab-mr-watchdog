@@ -59,8 +59,8 @@ func (config *WatchdogConfig) validate() {
 		err = errors.New("GitLab project is required")
 	case config.GitLab.Token == "":
 		err = errors.New("GitLab token is required")
-		// case config.Watchdog.Duration == nil:
-		// 	err = errors.New("GitLab token is required")
+	case config.Watchdog.Duration == 0:
+		err = errors.New("Watchdog duration is required, and should be an integer")
 	}
 
 	if err != nil {
@@ -153,17 +153,17 @@ func (utility *GitLabUtility) fetchProjectIDByName(isByGroup bool, name string) 
 			}
 		}
 
-		return -1, errors.New("")
+		return -1, errors.New("Group's project not found")
+	} else {
+		userID, err := utility.fetchUserIDByUsername()
+		projectID, err := utility.fetchProjectIDByUserIDAndProjectName(userID, name)
+
+		if err != nil {
+			return -1, err
+		}
+
+		return projectID, nil
 	}
-
-	userID, err := utility.fetchUserIDByUsername()
-	projectID, err := utility.fetchProjectIDByUserIDAndProjectName(userID, name)
-
-	if err != nil {
-		return -1, nil
-	}
-
-	return projectID, nil
 }
 
 // Fetch GitLab group's projects
@@ -191,7 +191,7 @@ func (utility *GitLabUtility) fetchGroupProjects() ([]GitLabProject, error) {
 
 		return model.Projects, nil
 	case 404:
-		return []GitLabProject{}, errors.New("----")
+		return []GitLabProject{}, errors.New("Group's project not found")
 	default:
 		body, _ := ioutil.ReadAll(response.Body)
 		return []GitLabProject{}, errors.New("Unknown: " + string(body))
@@ -229,15 +229,16 @@ func (utility *GitLabUtility) fetchUserIDByUsername() (int, error) {
 			return models[0].ID, nil
 		}
 
-		return -1, errors.New("----")
+		return -1, errors.New("Unknown error.")
 	case 404:
-		return -1, errors.New("----")
+		return -1, errors.New("User's project not found")
 	default:
 		body, _ := ioutil.ReadAll(response.Body)
 		return -1, errors.New("Unknown: " + string(body))
 	}
 }
 
+// Fetch GitLab project ID by user id & project name
 func (utility *GitLabUtility) fetchProjectIDByUserIDAndProjectName(userID int, projectName string) (int, error) {
 	apiURL := utility.host + "/api/v4/users/" + fmt.Sprint(userID) + "/projects?search=" + projectName
 	request, _ := http.NewRequest("GET", apiURL, nil)
@@ -265,13 +266,14 @@ func (utility *GitLabUtility) fetchProjectIDByUserIDAndProjectName(userID int, p
 			}
 		}
 
-		return -1, errors.New("----")
+		return -1, errors.New("Unkown error")
 	default:
 		body, _ := ioutil.ReadAll(response.Body)
 		return -1, errors.New("Unknown: " + string(body))
 	}
 }
 
+// Is current time in a duration
 func isNowInDuration(start string, end string) bool {
 	format := "15:04"
 	startHour, _ := time.Parse(format, start)
@@ -281,12 +283,14 @@ func isNowInDuration(start string, end string) bool {
 	return nowHour.Sub(startHour).Minutes() > 0 && nowHour.Sub(endHour).Minutes() < 0
 }
 
+// Is mr outdated
 func isTimeOut(createdAtTime string, updatedAtTime string, createdTimeOut float64, updatedTimeOut float64) bool {
 	format := "2006-01-02T15:04:05.999999-07:00"
 
 	return durationFromNow(createdAtTime, format) > createdTimeOut && durationFromNow(updatedAtTime, format) > updatedTimeOut
 }
 
+// Get duration from start time to current time
 func durationFromNow(start string, format string) float64 {
 	startTime, _ := time.Parse(format, start)
 
@@ -307,8 +311,9 @@ func main() {
 	gitlab := GitLabUtility{config.GitLab.Host, config.GitLab.Token, config.GitLab.Owner}
 
 	projectID, err := gitlab.fetchProjectIDByName(*isByGroup, config.GitLab.Project)
-	printErrorThenExit(err, "")
+	printErrorThenExit(err, "Fetched project ID by name erro: ")
 
+	fmt.Println("--- 🐶 Watchdog is running now 🐶 ---")
 	tick := time.Tick(time.Duration(config.Watchdog.Duration) * time.Minute)
 
 	num := 0
@@ -317,12 +322,11 @@ func main() {
 		case <-tick:
 			if isNowInDuration(config.TimeOut.Start, config.TimeOut.End) {
 				num++
-				fmt.Println("No.", num)
+				fmt.Println("✅ No.", num)
 
 				mergeRequests, _ := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
 				for _, mergeRequest := range mergeRequests {
-
 					if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
 						command := config.Watchdog.Action.Shell + " " + mergeRequest.Author.Username + " \"Your merge request [" + mergeRequest.Title + "] is still opened, please check it!\n\n" + mergeRequest.WebURL + "\""
 						cmd := exec.Command("/bin/bash", "-c", command)
@@ -336,7 +340,7 @@ func main() {
 					}
 				}
 			} else {
-				fmt.Println("Not in running durations.")
+				fmt.Println("⚠️ Current tiem is NOT in running durations. ⚠️")
 			}
 		}
 	}
