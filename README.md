@@ -8,6 +8,8 @@ Watch your GitLab merge requests status, then notify you in time.
 
 ![What](What.png)
 
+> If your team is using WeChat for enterprise, you can try this [Go script](https://gist.github.com/kingcos/86e399f455495a8bbbdc30a4b6e1d482) as shell command to send text message.
+
 ## Configurations
 
 ```yml
