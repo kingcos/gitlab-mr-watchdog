@@ -8,6 +8,8 @@
 
 监控 GitLab Merge Request 状态，并及时通知。
 
+> 如果你的团队使用企业微信，可以尝试使用该 [Go 脚本](https://gist.github.com/kingcos/86e399f455495a8bbbdc30a4b6e1d482) 作为 Shell 命令，以发送文本信息。
+
 ## 配置
 
 ```yml
