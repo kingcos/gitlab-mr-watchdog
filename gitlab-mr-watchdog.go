@@ -340,7 +340,7 @@ func main() {
 					}
 				}
 			} else {
-				fmt.Println("⚠️ Current tiem is NOT in running durations. ⚠️")
+				fmt.Println("⚠️ Current time is NOT in running durations. ⚠️")
 			}
 		}
 	}
