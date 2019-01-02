@@ -104,7 +104,7 @@ type GitLabMergeRequest struct {
 	Title     string `json:"title"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
-	WIP       string `json:"work_in_progress"`
+	WIP       bool   `json:"work_in_progress"`
 	WebURL    string `json:"web_url"`
 	Author    struct {
 		Name     string `json:"name"`
@@ -327,6 +327,10 @@ func main() {
 				mergeRequests, _ := gitlab.fetchMergeRequestsByID(projectID, "?state=opened")
 
 				for _, mergeRequest := range mergeRequests {
+					if mergeRequest.WIP {
+						fmt.Printf("Skipped: %s\n", mergeRequest.Title)
+						continue
+					}
 					if isTimeOut(mergeRequest.CreatedAt, mergeRequest.UpdatedAt, config.TimeOut.Created, config.TimeOut.Updated) {
 						command := config.Watchdog.Action.Shell + " " + mergeRequest.Author.Username + " \"Your merge request [" + mergeRequest.Title + "] is still opened, please check it!\n\n" + mergeRequest.WebURL + "\""
 						cmd := exec.Command("/bin/bash", "-c", command)
